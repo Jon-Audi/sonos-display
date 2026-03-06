@@ -15,9 +15,10 @@ export interface NowPlayingResponse {
     durationMs: number
     progressMs: number
   } | null
-  room:   string | null
-  volume: number
-  error?: string
+  room:       string | null
+  device:     string | null   // Spotify device name (headset, PC, etc.)
+  volume:     number
+  error?:     string
 }
 
 export async function GET(req: NextRequest) {
@@ -40,6 +41,30 @@ export async function GET(req: NextRequest) {
     console.error('[sonos]', sonosResult.reason?.message)
   }
 
+  const spotifyOnly = req.nextUrl.searchParams.get('spotifyOnly') === '1'
+
+  // Spotify-only mode: return global Spotify state regardless of Sonos
+  if (spotifyOnly) {
+    if (spotify) {
+      return NextResponse.json({
+        source:    'spotify',
+        isPlaying: spotify.isPlaying,
+        track: {
+          title:      spotify.name,
+          artist:     spotify.artists,
+          album:      spotify.album,
+          albumArt:   spotify.albumArt,
+          durationMs: spotify.durationMs,
+          progressMs: spotify.progressMs,
+        },
+        room:   null,
+        device: spotify.deviceName,
+        volume: spotify.deviceVolume ?? 50,
+      } satisfies NowPlayingResponse)
+    }
+    return NextResponse.json({ source: 'none', isPlaying: false, track: null, room: null, device: null, volume: 50 } satisfies NowPlayingResponse)
+  }
+
   // Prefer Spotify when it's actively playing — richer metadata + album art CDN
   if (spotify?.isPlaying) {
     const payload: NowPlayingResponse = {
@@ -54,6 +79,7 @@ export async function GET(req: NextRequest) {
         progressMs: spotify.progressMs,
       },
       room,
+      device: spotify.deviceName,
       volume: sonos?.volume ?? spotify.deviceVolume ?? 50,
     }
     return NextResponse.json(payload)
@@ -75,6 +101,7 @@ export async function GET(req: NextRequest) {
           }
         : null,
       room,
+      device: null,
       volume: sonos.volume,
     }
     return NextResponse.json(payload)
@@ -86,6 +113,7 @@ export async function GET(req: NextRequest) {
     isPlaying: false,
     track:     null,
     room,
+    device:    null,
     volume:    sonos?.volume ?? 50,
   }
   return NextResponse.json(idle)

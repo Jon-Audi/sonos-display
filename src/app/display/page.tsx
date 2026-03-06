@@ -250,13 +250,40 @@ function RoomPicker({ current, onSelect, onClose }: {
   )
 }
 
+// ── Tab bar ───────────────────────────────────────────────────────────────────
+
+function TabBar({ active, onChange }: { active: 'sonos' | 'spotify'; onChange: (t: 'sonos' | 'spotify') => void }) {
+  return (
+    <div className="flex gap-1 bg-black/30 rounded-lg p-1">
+      {(['sonos', 'spotify'] as const).map(tab => (
+        <button
+          key={tab}
+          onClick={() => onChange(tab)}
+          className={`
+            btn-touch px-4 py-1.5 rounded-md font-mono text-xs tracking-[0.15em] transition-all
+            ${active === tab
+              ? tab === 'spotify'
+                ? 'bg-green-500/20 text-green-400 border border-green-500/40'
+                : 'bg-cyan/15 text-cyan border border-cyan/40'
+              : 'text-muted hover:text-white'}
+          `}
+        >
+          {tab === 'sonos' ? '🔊 SONOS' : '🎵 SPOTIFY'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // ── Main display component ────────────────────────────────────────────────────
 
 function DisplayContent() {
   const searchParams  = useSearchParams()
   const router        = useRouter()
   const roomParam     = searchParams.get('room')
+  const tabParam      = searchParams.get('tab') as 'sonos' | 'spotify' | null
 
+  const [tab,         setTab]         = useState<'sonos' | 'spotify'>(tabParam === 'spotify' ? 'spotify' : 'sonos')
   const [room,        setRoom]        = useState<string | null>(roomParam)
   const [data,        setData]        = useState<NowPlayingResponse | null>(null)
   const [progressMs,  setProgressMs]  = useState(0)
@@ -271,7 +298,12 @@ function DisplayContent() {
 
   // ── Poll now-playing ───────────────────────────────────────────────────────
   const fetchNowPlaying = useCallback(async () => {
-    const url = `/api/now-playing${room ? `?room=${encodeURIComponent(room)}` : ''}`
+    let url: string
+    if (tab === 'spotify') {
+      url = '/api/now-playing?spotifyOnly=1'
+    } else {
+      url = `/api/now-playing${room ? `?room=${encodeURIComponent(room)}` : ''}`
+    }
     try {
       const res  = await fetch(url)
       const json = (await res.json()) as NowPlayingResponse
@@ -280,7 +312,7 @@ function DisplayContent() {
       setLastSync(Date.now())
       if (!volDragging) setVolume(json.volume)
     } catch { /* silently ignore network errors */ }
-  }, [room, volDragging])
+  }, [tab, room, volDragging])
 
   useEffect(() => {
     fetchNowPlaying()
@@ -305,24 +337,23 @@ function DisplayContent() {
 
   // ── Control helpers ────────────────────────────────────────────────────────
   const sendControl = useCallback(async (action: string, value?: number) => {
-    const source = data?.source ?? 'sonos'
-    // Always send to Sonos for room-level control; Spotify for play/pause if it's the source
-    if (room) {
-      await fetch('/api/sonos/control', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ room, action, value }),
-      })
-    } else if (source === 'spotify') {
+    if (tab === 'spotify') {
+      // Spotify tab: always control Spotify directly
       await fetch('/api/spotify/control', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ action, value }),
       })
+    } else if (room) {
+      // Sonos tab: control the selected room
+      await fetch('/api/sonos/control', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ room, action, value }),
+      })
     }
-    // Refresh after a short delay
     setTimeout(fetchNowPlaying, 400)
-  }, [room, data?.source, fetchNowPlaying])
+  }, [tab, room, fetchNowPlaying])
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value)
@@ -364,27 +395,32 @@ function DisplayContent() {
 
       {/* ── Top bar ── */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-3">
-        {/* Source badge */}
-        <div className={`
-          font-mono text-[10px] tracking-[0.2em] px-2 py-1 rounded border
-          ${source === 'spotify'
-            ? 'border-green-500/40 bg-green-500/10 text-green-400'
-            : source === 'sonos'
-            ? 'border-cyan/40 bg-cyan/10 text-cyan'
-            : 'border-border bg-surface text-muted'}
-        `}>
-          {source === 'spotify' ? '⬤ SPOTIFY' : source === 'sonos' ? '⬤ SONOS' : '○ IDLE'}
-        </div>
 
-        {/* Room selector */}
-        <button
-          onClick={() => setShowRooms(true)}
-          className="btn-touch flex items-center gap-2 font-mono text-xs tracking-widest text-white/60 hover:text-white transition-colors"
-        >
-          <span>🔊</span>
-          <span>{room?.toUpperCase() ?? 'ALL ROOMS'}</span>
-          <span className="text-muted">▾</span>
-        </button>
+        {/* Tab switcher */}
+        <TabBar active={tab} onChange={t => { setTab(t); setData(null) }} />
+
+        {/* Centre: room selector (Sonos) or device name (Spotify) */}
+        <div className="flex-1 flex justify-center">
+          {tab === 'sonos' ? (
+            <button
+              onClick={() => setShowRooms(true)}
+              className="btn-touch flex items-center gap-2 font-mono text-xs tracking-widest text-white/60 hover:text-white transition-colors"
+            >
+              <span>🔊</span>
+              <span>{room?.toUpperCase() ?? 'ALL ROOMS'}</span>
+              <span className="text-muted">▾</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 font-mono text-xs tracking-widest text-white/40">
+              {data?.device && (
+                <>
+                  <span className="text-green-400/60">▶</span>
+                  <span>{data.device}</span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Pioneer mode toggle */}
         <button
