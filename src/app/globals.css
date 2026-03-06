@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background: #080808;
+  color: #fff;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* Smooth album art transitions */
+.art-transition {
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+/* Progress bar animation */
+.progress-fill {
+  transition: width 0.8s linear;
+}
+
+/* Touch feedback */
+.btn-touch {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* Custom scrollbar (hidden for kiosk) */
+::-webkit-scrollbar { display: none; }
+
+/* Volume slider styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.15);
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #00d4ff;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0,212,255,0.6);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #00d4ff;
+  cursor: pointer;
+  border: none;
+}
+
+/* Pioneer animation display — pixelated scaling */
+.pioneer-anim {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Scanline overlay for Pioneer mode */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.2) 0px,
+    rgba(0,0,0,0.2) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 10;
+}
